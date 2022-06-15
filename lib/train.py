@@ -93,5 +93,5 @@ def train(model, optimizer, criterion, train_dataloader,
         results['precision'].append(precision)
         results['recall'].append(recall)
         results['time'].append(end - start)
-        
+    torch.save(results, f'{optim}_results')
     return results
