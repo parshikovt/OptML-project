@@ -1,101 +1,97 @@
-from lib.utils import tensorsFromPair 
 import torch
 from torch import nn
 import torch.nn.functional as F
-import random
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
+from tqdm import tqdm_notebook
+import numpy as np
+import time
+
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
 
-MAX_LENGTH = 10
-SOS_token = 0
-EOS_token = 1
-teacher_forcing_ratio = 0.5
-
-def train_batch(input_tensor, 
-          target_tensor, 
-          encoder, decoder, 
-          encoder_optimizer, 
-          decoder_optimizer, 
-          criterion, device,
-          max_length=MAX_LENGTH):
-    
-    encoder_hidden = encoder.initHidden()
-    encoder_optimizer.zero_grad()
-    decoder_optimizer.zero_grad()
-
-    input_length = input_tensor.size(0)
-    target_length = target_tensor.size(0)
-
-    encoder_outputs = torch.zeros(max_length, encoder.hidden_size, device=device)
-
-    loss = 0
-
-    for ei in range(input_length):
-        encoder_output, encoder_hidden = encoder(input_tensor[ei], encoder_hidden)
-        encoder_outputs[ei] = encoder_output[0, 0]
-
-    decoder_input = torch.tensor([[SOS_token]], device=device)
-
-    decoder_hidden = encoder_hidden
-
-    use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
-
-    if use_teacher_forcing:
-        for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
-            loss += criterion(decoder_output, target_tensor[di])
-            decoder_input = target_tensor[di]
-
-    else:
-        for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
-            topv, topi = decoder_output.topk(1)
-            decoder_input = topi.squeeze().detach()
-
-            loss += criterion(decoder_output, target_tensor[di])
-            if decoder_input.item() == EOS_token:
-                break
-    loss.backward()
-
-    encoder_optimizer.step()
-    decoder_optimizer.step()
-
-    return loss.item() / target_length
-
-
-
-def train(encoder, decoder, 
-          n_iters,
-          encoder_optimizer,
-          decoder_optimizer,
-          train_pairs,
-          device,
-          source,
-          target,
-          print_every=10):
-#     plot_losses = []
-    print_loss_total = 0  
-#     plot_loss_total = 0 
-
-    training_pairs = [tensorsFromPair(source, target, random.choice(train_pairs), device)
-                      for i in range(n_iters)]
-    criterion = nn.NLLLoss()
-    train_loss = []
-    for iter in range(1, n_iters + 1):
-        training_pair = training_pairs[iter - 1]
-        input_tensor = training_pair[0]
-        target_tensor = training_pair[1]
-
-        loss = train_batch(input_tensor, target_tensor, encoder, 
-                           decoder, encoder_optimizer, 
-                           decoder_optimizer, criterion, device)
-        print_loss_total += loss
-#         plot_loss_total += loss
-        train_loss.append(loss)
-        if iter % print_every == 0:
-            print_loss_avg = print_loss_total / print_every
-            print_loss_total = 0
-            print(iter, print_loss_avg)
+def train_epoch(model, optimizer, criterion, train_dataloader, device, optim):
+    model.train()
+    loss_epoch = []
+    for batch in train_dataloader:
+        if optim == 'LBFGS':
+            def closure():
+                optimizer.zero_grad()
+                prediction = model(batch[0].to(device))
+                loss = criterion(prediction, batch[1].to(device))
+                loss.backward()
+                return loss
+            prediction = model(batch[0].to(device))
+            loss = criterion(prediction, batch[1].to(device))
+            optimizer.step(closure)
             
-    return train_loss
+        elif optim == 'AdaHessian':
+            optimizer.zero_grad()
+            prediction = model(batch[0].to(device))
+            loss = criterion(prediction, batch[1].to(device))
+            loss.backward(create_graph=True)
+            optimizer.step()
+
+        else:
+            optimizer.zero_grad()
+            prediction = model(batch[0].to(device))
+            loss = criterion(prediction, batch[1].to(device))
+            loss.backward()
+            optimizer.step()
+            
+        loss_epoch.append(loss.item())
+        
+    return np.mean(loss_epoch)
+
+def compute_scores(predictions, targets):
+    targets = np.hstack(targets)
+    predictions = np.concatenate(predictions, axis = 0)
+    predicted_labels = np.argmax(predictions, axis = 1)
+    accuracy = accuracy_score(targets, predicted_labels, )
+    f1 = f1_score(targets, predicted_labels, average='macro')
+    precision = precision_score(targets, predicted_labels, average='macro')
+    recall = recall_score(targets, predicted_labels, average='macro')
+    
+    return accuracy, f1, precision, recall
+
+
+@torch.no_grad()
+def valid_epoch(model, criterion, valid_dataloader, device):
+    model.eval()
+    valid_epoch = []
+    predictions = []
+    targets = []
+    for batch in valid_dataloader:
+        prediction = model(batch[0].to(device))
+        loss = criterion(prediction, batch[1].to(device))
+        valid_epoch.append(loss.item())
+        predictions.append(prediction.cpu().detach().numpy())
+        targets.append(batch[1].cpu().detach().numpy())
+    accuracy, f1, precision, recall = compute_scores(predictions, targets)
+    
+    return np.mean(valid_epoch), accuracy, f1, precision, recall
+
+def train(model, optimizer, criterion, train_dataloader, 
+          valid_dataloader, device, epochs = 100,
+          optim="Adam", verbose=False):
+    
+    results = {'train': [], 'valid': [], 'accuracy': [], 
+               'f1': [], 'precision': [], 'recall': [], 'time': []}
+    
+    for epoch in tqdm_notebook(range(epochs)):
+        start = time.time()
+        train_loss = train_epoch(model, optimizer, criterion, train_dataloader, device, optim)
+        end = time.time()
+        valid_loss, accuracy, f1, precision, recall = valid_epoch(model, criterion, valid_dataloader, device)
+        if verbose:
+            print(f'Epoch: {epoch}, train_loss: {train_loss},'+
+                  f'valid_loss: {valid_loss}, f1: {f1}, time: {end - start}')
+        results['train'].append(train_loss)
+        results['valid'].append(valid_loss)
+        results['accuracy'].append(accuracy)
+        results['f1'].append(f1)
+        results['precision'].append(precision)
+        results['recall'].append(recall)
+        results['time'].append(end - start)
+        
+    return results
