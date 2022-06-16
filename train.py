@@ -23,12 +23,15 @@ cifar_testset = datasets.CIFAR10(root='data', train=False, download=True, transf
 train_dataloader = torch.utils.data.DataLoader(cifar_trainset, batch_size=256, shuffle=True)
 valid_dataloader = torch.utils.data.DataLoader(cifar_testset, batch_size=256, shuffle=False)
 
-optims =  ['AdaHessian', 'BB']
+optims =  ['Adam', 'SGD_lr=0.1', 'SGD_lr=0.01',
+           'AdaHessian', 'LBFGS', 'SGD momentum', 'BB']
           
 def init_optim(optim, model):
     if optim == 'Adam':
         optimizer = torch.optim.Adam(model.parameters(), lr = 5e-4)
-    elif optim == 'SGD':
+    elif optim == 'SGD_lr=0.1':
+        optimizer = torch.optim.SGD(model.parameters(), lr = 1e-1)
+    elif optim == 'SGD_lr=0.01':
         optimizer = torch.optim.SGD(model.parameters(), lr = 1e-2)
     elif optim == 'SGD momentum':
         optimizer = torch.optim.SGD(model.parameters(), momentum = 0.9, lr = 1e-2)
