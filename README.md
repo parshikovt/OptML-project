@@ -16,6 +16,18 @@ Also there is `Experiments.ipynb` notebook with experiments and `train.py` scrip
 
 Folder `results` contains the dictionaries with results (train and valid loss, scores and running time) for `Adam`, `SGD`, `SGD-momentum`, `AdaHessian`, `BB` optimizers.
 
+
+The project has been developed and test with `Python 3.7.11`
+
+Required libraries:
+
+- `torchvision == 0.12.0`
+- `matplotlib.pyplot`
+- `sklearn`
+- `numpy`
+- `time`
+- `torch == 1.11.0`
+
 ## Team
 
 This project is accomplished by:  
