@@ -31,6 +31,6 @@ Required libraries:
 ## Team
 
 This project is accomplished by:  
-- Anastasia Filippova anastasia.filippova@epfl.ch
+- Anastasia Filippova anastasiia.filippova@epfl.ch
 - Sofia Blinova sofia.blinova@epfl.ch
-- Tikhon Parshokov tikhon.parshikov@epfl.ch
+- Tikhon Parshikov tikhon.parshikov@epfl.ch
