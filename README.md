@@ -31,6 +31,6 @@ Required libraries:
 ## Team
 
 This project is accomplished by:  
-- Anastasia Filippova anastasiia.filippova@epfl.ch (SCIPER: **337602**)
+- Anastasiia Filippova anastasiia.filippova@epfl.ch (SCIPER: **337602**)
 - Sofia Blinova sofia.blinova@epfl.ch (SCIPER: **337555**)
 - Tikhon Parshikov tikhon.parshikov@epfl.ch (SCIPER: **342141**)
